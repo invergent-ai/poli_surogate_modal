@@ -1,0 +1,51 @@
+# ==========================================================================
+# Surogate SFT config — recipe BF16 (bază)
+# Rulat cu:  modal run run_gpu_test.py::test_l4
+#            modal run run_gpu_test.py::test_a100
+# Merge pe ORICE GPU (T4, L4, A10, L40S, A100-*, H100, H200, RTX PRO 6000, B200).
+# ==========================================================================
+
+model: Qwen/Qwen3-0.6B                # modelul de bază (HuggingFace id). Schimbă pentru alt model.
+output_dir: /output                    # cale în container. Modal o mapează către Volume "surogate-outputs".
+
+# --- Batch & accumulare ---
+per_device_train_batch_size: 2         # câte exemple pe GPU per pas (limitat de VRAM)
+gradient_accumulation_steps: 4         # acumulează gradienții peste N mini-batches → batch efectiv = 2*4 = 8
+
+# --- Secvențe ---
+sample_packing: true                   # împachetează mai multe documente într-o secvență (mult mai eficient)
+sequence_len: 2048                     # lungimea maximă în tokeni. Crește → mai mult VRAM.
+
+# --- Durata antrenamentului ---
+max_steps: 50                          # număr TOTAL de pași (pentru test rapid). La real: 500-5000.
+eval_steps: 0                          # 0 = fără evaluare intermediară. Setează 25/50/100 pentru a vedea val loss.
+
+# --- Optimizare ---
+learning_rate: 2e-4                    # LR tipic pentru LoRA. Full fine-tune: 1e-5 … 5e-5.
+warmup_ratio: 0.15                     # 15% din pași = warmup liniar al LR-ului
+
+# --- Precizia de calcul ---
+# bf16 = precizie de bază, merge pe orice GPU modern, fără overhead de quantizare.
+# Alternative: fp8-hybrid (L4/L40S/H100/...), nvfp4 (doar Blackwell).
+recipe: bf16
+
+# --- LoRA (Low-Rank Adaptation) ---
+# Antrenează doar adaptori mici peste modelul înghețat → VRAM și timp mult mai mici.
+lora: true
+lora_rank: 16                          # rangul matricilor LoRA. Tipic 8-64. Mai mare = mai multă capacitate + VRAM.
+lora_alpha: 32                         # scalare (lora_alpha/lora_rank). Convenția: alpha = 2 * rank.
+lora_dropout: 0                        # dropout peste adaptori. 0 pentru seturi mici, 0.05-0.1 la overfit.
+lora_target_modules:                   # ce straturi atașăm adaptori. Lista de mai jos = "all-linear" pentru Qwen.
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+# --- Data loading ---
+dataloader_num_workers: 4              # procese paralele pentru tokenizare/packing
+datasets:
+  - path: "OpenLLM-Ro/ro_gsm8k"        # dataset HF (sau cale locală .jsonl). Înlocuiește cu al tău.
+    type: auto                          # auto-detect format. Alt opțiuni: alpaca, sharegpt, completion, chat.
