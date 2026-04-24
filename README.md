@@ -7,14 +7,14 @@ diferite, cu dataset-ul românesc `OpenLLM-Ro/ro_gsm8k`.
 
 **Structura repo-ului:**
 
-| Fișier                         | Rol                                                            |
-| ------------------------------ | -------------------------------------------------------------- |
-| `run_gpu_test.py`              | Script Modal cu 4 funcții, una pe GPU - rulează SFT            |
-| `configs/bf16.yaml`            | Config SFT recipe **bf16** (merge pe orice GPU)                |
-| `configs/fp8.yaml`             | Config SFT recipe **fp8-hybrid** (Ada+)                        |
-| `configs/nvfp4.yaml`           | Config SFT recipe **nvfp4** (doar Blackwell)                   |
-| `scripts/merge_checkpoint.py`  | Script Modal care combină LoRA-ul cu modelul de bază           |
-| `images/`                      | Screenshot-uri din Modal de la rulările de referință           |
+| Fișier                        | Rol                                                  |
+| ----------------------------- | ---------------------------------------------------- |
+| `run_gpu_test.py`             | Script Modal cu 4 funcții, una pe GPU - rulează SFT  |
+| `configs/bf16.yaml`           | Config SFT recipe **bf16** (merge pe orice GPU)      |
+| `configs/fp8.yaml`            | Config SFT recipe **fp8-hybrid** (Ada+)              |
+| `configs/nvfp4.yaml`          | Config SFT recipe **nvfp4** (doar Blackwell)         |
+| `scripts/merge_checkpoint.py` | Script Modal care combină LoRA-ul cu modelul de bază |
+| `images/`                     | Screenshot-uri din Modal de la rulările de referință |
 
 ---
 
@@ -38,19 +38,13 @@ uv pip install modal                 # instalează Modal CLI + SDK
 **Pasul 2 - autentificare.** Încearcă:
 
 ```bash
-modal token new                      # deschide browserul, te loghezi, salvează token-ul
+modal setup # deschide browserul, te loghezi, salvează token-ul
 ```
 
 Dacă din vreun motiv `modal` nu e pe PATH, rulează varianta echivalentă:
 
 ```bash
 python -m modal setup
-```
-
-**Verifică:**
-
-```bash
-modal profile current                 # ar trebui să afișeze username-ul tău Modal
 ```
 
 ---
@@ -143,14 +137,14 @@ modal volume get surogate-outputs / ./out     # descarcă-l local în ./out/
 
 Ce găsești în volum după un run:
 
-| Fișier                            | Rol                                  |
-| --------------------------------- | ------------------------------------ |
+| Fișier                            | Rol                                     |
+| --------------------------------- | --------------------------------------- |
 | `adapter_model.safetensors`       | Weights-urile LoRA (adapterul antrenat) |
-| `adapter_config.json`             | Meta-date LoRA (rank, alpha, etc.)   |
-| `log-<nume-run>-<timestamp>.json` | Log complet cu toți pașii            |
-| `training_plot.png`               | Graficul cu loss-ul                  |
-| `train-000.bin`, `eval-000.bin`   | Dataset tokenizat (cache)            |
-| `.tokenize_hash`                  | Hash pentru invalidare cache         |
+| `adapter_config.json`             | Meta-date LoRA (rank, alpha, etc.)      |
+| `log-<nume-run>-<timestamp>.json` | Log complet cu toți pașii               |
+| `training_plot.png`               | Graficul cu loss-ul                     |
+| `train-000.bin`, `eval-000.bin`   | Dataset tokenizat (cache)               |
+| `.tokenize_hash`                  | Hash pentru invalidare cache            |
 
 > ⚠️ **Atenție:** toate rulările scriu în același `output_dir`, deci
 > `adapter_model.safetensors` se **suprascrie** la fiecare run. Ca să
@@ -194,11 +188,11 @@ modal run scripts/merge_checkpoint.py \
 
 Argumente:
 
-| Argument            | Ce e                                                                       |
-| ------------------- | -------------------------------------------------------------------------- |
-| `--base-model`      | HF id (`Qwen/Qwen3-0.6B`) sau un director local cu modelul de bază         |
-| `--checkpoint-dir`  | Director cu `adapter_model.safetensors` + `adapter_config.json`            |
-| `--output`          | Unde se scrie modelul combinat (tot în Volume → persistă între rulări)     |
+| Argument           | Ce e                                                                   |
+| ------------------ | ---------------------------------------------------------------------- |
+| `--base-model`     | HF id (`Qwen/Qwen3-0.6B`) sau un director local cu modelul de bază     |
+| `--checkpoint-dir` | Director cu `adapter_model.safetensors` + `adapter_config.json`        |
+| `--output`         | Unde se scrie modelul combinat (tot în Volume → persistă între rulări) |
 
 După merge, descarci modelul local:
 
