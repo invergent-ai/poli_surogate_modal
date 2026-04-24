@@ -1,94 +1,97 @@
-#!/usr/bin/env python3
 """
-Combină un checkpoint LoRA cu modelul de bază și produce un director de model
-gata de servit (care poate fi încărcat direct cu `AutoModelForCausalLM`).
+Merge LoRA pe Modal — combină adapter-ul LoRA cu modelul de bază într-un
+director gata de servit (se poate încărca direct cu `AutoModelForCausalLM`
+din transformers, vLLM etc.).
 
-Cum îl rulezi:
+Folosire:
 
-    python merge_checkpoint.py \\
+    modal run scripts/merge_checkpoint.py \\
         --base-model Qwen/Qwen3-0.6B \\
-        --checkpoint-dir ./output/step_00000050 \\
-        --output ./merged_model
+        --checkpoint-dir /output \\
+        --output /output/merged
 
-Script-ul trebuie rulat cu Python-ul care are Surogate instalat
-(adică venv-ul creat de installer-ul Surogate). În container-ul Modal
-din acest repo: `/opt/surogate/.venv/bin/python`.
+Argumente:
+  --base-model       HF id (ex. Qwen/Qwen3-0.6B) sau cale locală
+  --checkpoint-dir   director din Volume cu adapter_model.safetensors +
+                     adapter_config.json (`/output` e montat din Volume)
+  --output           director destinație în Volume (persistă între rulări)
+
+După merge, descarci modelul local cu:
+
+    modal volume get surogate-outputs /merged ./merged
+
+Notă: Dacă vrei ca Surogate să facă merge-ul AUTOMAT la finalul
+antrenamentului, adaugă `merge_adapter: true` în YAML. Script-ul ăsta e
+util doar pentru checkpoint-uri antrenate fără acel parametru.
 """
+import subprocess
+import textwrap
 
-import argparse
-import os
-import sys
+import modal
 
-# Permite rularea din rădăcina repo-ului fără `pip install -e .`
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Python-ul instalat de Surogate în container. Singurul care poate face
+# `from surogate.utils.adapter_merge import merge_adapter`.
+SUROGATE_PYTHON = "/opt/surogate/.venv/bin/python"
 
-from surogate.utils.adapter_merge import merge_adapter
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="Combină un checkpoint LoRA cu modelul de bază."
+image = (
+    modal.Image.from_registry(
+        "nvidia/cuda:12.8.0-devel-ubuntu24.04", add_python="3.12"
     )
-    parser.add_argument(
-        "--base-model", required=True,
-        help="Calea către modelul de bază (director local sau HuggingFace model ID).",
+    .apt_install("curl", "git", "ca-certificates")
+    .run_commands(
+        "mkdir -p /opt/surogate",
+        "cd /opt/surogate && curl -LsSf https://surogate.ai/install.sh | bash",
+        gpu="T4",
     )
-    parser.add_argument(
-        "--checkpoint-dir", required=True,
-        help="Calea către directorul checkpoint-ului (ex. output/step_00000050).",
+)
+
+vol = modal.Volume.from_name("surogate-outputs", create_if_missing=True)
+app = modal.App("surogate-merge")
+
+# Codul care face merge-ul efectiv. Rulează cu Python-ul Surogate (are
+# acces la `surogate.utils.adapter_merge`). Primește 3 argumente pe argv.
+_MERGE_CODE = textwrap.dedent("""
+    import os
+    import sys
+
+    from surogate.utils.adapter_merge import merge_adapter
+
+    base, ckpt, out = sys.argv[1:4]
+
+    # Dacă baza nu e un director local, o descarcă de pe HuggingFace.
+    if not os.path.isdir(base):
+        from huggingface_hub import snapshot_download
+        print(f"Descarc modelul de bază de pe HF: {base}")
+        base = snapshot_download(base)
+
+    # Verifică că checkpoint-ul are fișierele adapter.
+    if not os.path.exists(os.path.join(ckpt, "adapter_model.safetensors")):
+        sys.exit(f"Eroare: nu am găsit adapter_model.safetensors în {ckpt}")
+    if not os.path.exists(os.path.join(ckpt, "adapter_config.json")):
+        sys.exit(f"Eroare: nu am găsit adapter_config.json în {ckpt}")
+
+    print(f"Model de bază: {base}")
+    print(f"Checkpoint:    {ckpt}")
+    print(f"Output:        {out}")
+
+    merge_adapter(base_model_path=base, adapter_path=ckpt, output_path=out)
+    print(f"\\nModel combinat salvat în {out}")
+""")
+
+
+@app.function(image=image, gpu="T4", timeout=20 * 60, volumes={"/output": vol})
+def merge(base_model: str, checkpoint_dir: str, output: str) -> None:
+    subprocess.run(
+        [SUROGATE_PYTHON, "-c", _MERGE_CODE, base_model, checkpoint_dir, output],
+        check=True,
     )
-    parser.add_argument(
-        "--output", required=True,
-        help="Directorul de ieșire unde va fi salvat modelul combinat.",
-    )
-    args = parser.parse_args()
-
-    # Rezolvă calea modelului de bază — dacă nu e un director local, descarcă de pe HuggingFace
-    base_model_path = args.base_model
-    if not os.path.isdir(base_model_path):
-        try:
-            from huggingface_hub import snapshot_download
-            print(f"Descarc modelul de bază de pe HuggingFace: {base_model_path}")
-            base_model_path = snapshot_download(base_model_path)
-        except Exception as e:
-            print(
-                f"Eroare: '{args.base_model}' nu e un director local și "
-                f"nu a putut fi descărcat de pe HuggingFace: {e}",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-    # Validează că directorul checkpoint-ului conține fișierele adapter LoRA
-    checkpoint_dir = args.checkpoint_dir
-    adapter_file = os.path.join(checkpoint_dir, "adapter_model.safetensors")
-    adapter_config = os.path.join(checkpoint_dir, "adapter_config.json")
-    if not os.path.exists(adapter_file):
-        print(
-            f"Eroare: nu am găsit adapter_model.safetensors în {checkpoint_dir}. "
-            "Ești sigur că e un checkpoint LoRA?",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-    if not os.path.exists(adapter_config):
-        print(
-            f"Eroare: nu am găsit adapter_config.json în {checkpoint_dir}.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    print(f"Model de bază:  {base_model_path}")
-    print(f"Checkpoint:     {checkpoint_dir}")
-    print(f"Output:         {args.output}")
-
-    # Apelul efectiv — Surogate face merge-ul greutăților LoRA în modelul de bază
-    merge_adapter(
-        base_model_path=base_model_path,
-        adapter_path=checkpoint_dir,
-        output_path=args.output,
-    )
-
-    print(f"\nModel combinat salvat în {args.output}")
+    vol.commit()
 
 
-if __name__ == "__main__":
-    main()
+@app.local_entrypoint()
+def main(
+    base_model: str = "Qwen/Qwen3-0.6B",
+    checkpoint_dir: str = "/output",
+    output: str = "/output/merged",
+) -> None:
+    merge.remote(base_model, checkpoint_dir, output)

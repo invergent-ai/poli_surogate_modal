@@ -13,8 +13,7 @@ diferite, cu dataset-ul românesc `OpenLLM-Ro/ro_gsm8k`.
 | `configs/bf16.yaml`            | Config SFT recipe **bf16** (merge pe orice GPU)                |
 | `configs/fp8.yaml`             | Config SFT recipe **fp8-hybrid** (Ada+)                        |
 | `configs/nvfp4.yaml`           | Config SFT recipe **nvfp4** (doar Blackwell)                   |
-| `merge_lora.py`                | Script Modal care combină LoRA-ul cu modelul de bază           |
-| `scripts/merge_checkpoint.py`  | Implementarea merge-ului (apelată în container de Surogate)    |
+| `scripts/merge_checkpoint.py`  | Script Modal care combină LoRA-ul cu modelul de bază           |
 | `images/`                      | Screenshot-uri din Modal de la rulările de referință           |
 
 ---
@@ -176,18 +175,18 @@ merge_adapter: true
 ```
 
 (default e `false`). Când e activ, după ultimul pas Surogate salvează în
-`output_dir` și adapter-ul LoRA **și** modelul combinat — deci nu mai ai
-nevoie de `merge_lora.py`.
+`output_dir` **și** adapter-ul LoRA **și** modelul combinat — deci nu mai
+ai nevoie de script extern.
 
 ### Varianta manuală — când NU ai setat `merge_adapter`
 
 Dacă ai antrenat fără `merge_adapter: true` (sau vrei să combini un
-checkpoint vechi cu alt model de bază), `merge_lora.py` face merge-ul
-pe Modal, folosind Python-ul Surogate din container (nu trebuie instalat
-nimic local).
+checkpoint vechi cu alt model de bază), `scripts/merge_checkpoint.py`
+face merge-ul pe Modal, folosind Python-ul Surogate din container (nu
+trebuie instalat nimic local).
 
 ```bash
-modal run merge_lora.py \
+modal run scripts/merge_checkpoint.py \
     --base-model Qwen/Qwen3-0.6B \
     --checkpoint-dir /output \
     --output /output/merged
@@ -207,16 +206,10 @@ După merge, descarci modelul local:
 modal volume get surogate-outputs /merged ./merged
 ```
 
-**Intern:** `merge_lora.py` (wrapper Modal) apelează
-`scripts/merge_checkpoint.py` (logica de merge) cu Python-ul Surogate
-(`/opt/surogate/.venv/bin/python`). Merge-ul foloseste
-`surogate.utils.adapter_merge.merge_adapter` care descarcă modelul de
-bază dacă nu e prezent și combină greutățile LoRA direct în straturile
-corespunzătoare.
-
-> Dacă vrei să rulezi merge-ul local (nu pe Modal), ai nevoie de Surogate
-> instalat. Atunci `scripts/merge_checkpoint.py` se rulează direct cu
-> Python-ul din venv-ul Surogate, cu aceleași argumente.
+**Intern:** Python-ul Modal nu are acces la `surogate` (e instalat într-un
+venv separat, `/opt/surogate/.venv/`). Script-ul apelează acel Python cu
+`subprocess`, care face `from surogate.utils.adapter_merge import
+merge_adapter` și combină greutățile LoRA direct în straturile modelului.
 
 ---
 
