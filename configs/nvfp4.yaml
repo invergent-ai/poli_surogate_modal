@@ -1,5 +1,5 @@
 # ==========================================================================
-# Surogate SFT config — recipe NVFP4 (doar Blackwell)
+# Surogate SFT config - recipe NVFP4 (doar Blackwell)
 # Rulat cu:  modal run run_gpu_test.py::test_rtx_pro_6000
 # Cere SM ≥ 10.0: RTX PRO 6000, B200.
 # NU merge pe: T4, L4, A10, L40S, A100-*, H100, H200.
@@ -22,7 +22,7 @@ warmup_ratio: 0.15
 
 # --- NVFP4 ---
 # Matmul-urile rulează în FP4 (E2M1) folosind tensor cores Blackwell.
-# Peak theoretic ~4× față de BF16. Loss-ul final e puțin mai mare — trade-off normal.
+# Peak theoretic ~4× față de BF16. Loss-ul final e puțin mai mare - trade-off normal.
 recipe: nvfp4
 fp4_backend: cutlass                   # kernel-ul FP4. Alternativă: "cudnn".
 skip_quant_last_layers: 4              # ultimele N blocuri rămân în BF16 pentru stabilitate numerică.

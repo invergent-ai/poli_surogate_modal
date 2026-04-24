@@ -1,5 +1,5 @@
 """
-Merge LoRA pe Modal — combină adapter-ul LoRA cu modelul de bază într-un
+Merge LoRA pe Modal - combină adapter-ul LoRA cu modelul de bază într-un
 director gata de servit (se poate încărca direct cu `AutoModelForCausalLM`
 din transformers, vLLM etc.).
 

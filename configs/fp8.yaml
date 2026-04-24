@@ -1,5 +1,5 @@
 # ==========================================================================
-# Surogate SFT config — recipe FP8-hybrid
+# Surogate SFT config - recipe FP8-hybrid
 # Rulat cu:  modal run run_gpu_test.py::test_l40s
 # Cere SM ≥ 8.9 (Ada Lovelace+): L4, L40S, H100, H200, RTX PRO 6000, B200.
 # NU merge pe: T4, A10, A100 (Ampere, fără tensor cores FP8).

@@ -1,6 +1,6 @@
 # Surogate SFT pe Modal
 
-Ghid practic pentru antrenare (SFT — Supervised Fine-Tuning) cu
+Ghid practic pentru antrenare (SFT - Supervised Fine-Tuning) cu
 [Surogate](https://docs.surogate.ai) pe GPU închiriat de la
 [Modal](https://modal.com). Include 4 rulări gata făcute pe 4 GPU-uri
 diferite, cu dataset-ul românesc `OpenLLM-Ro/ro_gsm8k`.
@@ -9,7 +9,7 @@ diferite, cu dataset-ul românesc `OpenLLM-Ro/ro_gsm8k`.
 
 | Fișier                         | Rol                                                            |
 | ------------------------------ | -------------------------------------------------------------- |
-| `run_gpu_test.py`              | Script Modal cu 4 funcții, una pe GPU — rulează SFT            |
+| `run_gpu_test.py`              | Script Modal cu 4 funcții, una pe GPU - rulează SFT            |
 | `configs/bf16.yaml`            | Config SFT recipe **bf16** (merge pe orice GPU)                |
 | `configs/fp8.yaml`             | Config SFT recipe **fp8-hybrid** (Ada+)                        |
 | `configs/nvfp4.yaml`           | Config SFT recipe **nvfp4** (doar Blackwell)                   |
@@ -20,11 +20,11 @@ diferite, cu dataset-ul românesc `OpenLLM-Ro/ro_gsm8k`.
 
 ## 1. Setup
 
-**Pasul 0 — cont Modal.** Înainte de orice, intră pe
+**Pasul 0 - cont Modal.** Înainte de orice, intră pe
 [modal.com](https://modal.com) și fă-ți cont (gratuit, iți dă $30 credit
 lunar). Fără cont, `modal token new` nu are unde să te autentifice.
 
-**Pasul 1 — venv + modal.** Din folderul repo-ului:
+**Pasul 1 - venv + modal.** Din folderul repo-ului:
 
 ```bash
 uv venv --python 3.12                # creează .venv/ cu Python 3.12
@@ -35,7 +35,7 @@ uv pip install modal                 # instalează Modal CLI + SDK
 > Dacă n-ai `uv`, îl instalezi cu `curl -LsSf https://astral.sh/uv/install.sh | sh`.
 > Alternativ, poți folosi `python3.12 -m venv .venv && pip install modal`.
 
-**Pasul 2 — autentificare.** Încearcă:
+**Pasul 2 - autentificare.** Încearcă:
 
 ```bash
 modal token new                      # deschide browserul, te loghezi, salvează token-ul
@@ -115,18 +115,18 @@ cache-uiește). Următoarele rulări pornesc containerul în ~10 s.
 
 ### Detalii scurte pe fiecare
 
-**1. L4 + bf16** — cea mai ieftină opțiune. Throughput redus dar loss
+**1. L4 + bf16** - cea mai ieftină opțiune. Throughput redus dar loss
 identic cu GPU-urile mari (bf16 e determinist). Bun pentru verificări.
 
-**2. L40S + fp8-hybrid** — sweet spot calitate/preț: peak BF16 362 TFLOP/s,
+**2. L40S + fp8-hybrid** - sweet spot calitate/preț: peak BF16 362 TFLOP/s,
 peak FP8 733 TFLOP/s. ~2.5× mai rapid decât L4 pentru același rezultat.
 
-**3. A100-80GB + bf16** — aceeași viteză ca L40S, dar 80 GB VRAM → poți
+**3. A100-80GB + bf16** - aceeași viteză ca L40S, dar 80 GB VRAM → poți
 antrena modele mult mai mari (LoRA pe ~30B sau full fine-tune pe ~3B).
 
-**4. RTX PRO 6000 + nvfp4** — cea mai rapidă (39.6k tok/s). Pipeline-ul
+**4. RTX PRO 6000 + nvfp4** - cea mai rapidă (39.6k tok/s). Pipeline-ul
 CUTLASS FP4 e primat automat ("FP4 cache primed: 96 fwd + 96 bwd").
-Loss puțin mai mare — compromis așteptat pentru precizie 4-bit.
+Loss puțin mai mare - compromis așteptat pentru precizie 4-bit.
 
 **Cum arată la final** (LoRA salvat, training complete):
 
@@ -145,10 +145,10 @@ Ce găsești în volum după un run:
 
 | Fișier                            | Rol                                  |
 | --------------------------------- | ------------------------------------ |
-| `adapter_model.safetensors`       | Greutățile LoRA (adapterul antrenat) |
+| `adapter_model.safetensors`       | Weights-urile LoRA (adapterul antrenat) |
 | `adapter_config.json`             | Meta-date LoRA (rank, alpha, etc.)   |
 | `log-<nume-run>-<timestamp>.json` | Log complet cu toți pașii            |
-| `training_plot.png`               | Graficul cu pierderea                |
+| `training_plot.png`               | Graficul cu loss-ul                  |
 | `train-000.bin`, `eval-000.bin`   | Dataset tokenizat (cache)            |
 | `.tokenize_hash`                  | Hash pentru invalidare cache         |
 
@@ -159,13 +159,13 @@ Ce găsești în volum după un run:
 
 ---
 
-## 6. Merge LoRA — obține modelul gata de servit
+## 6. Merge LoRA - obține modelul gata de servit
 
 După antrenament ai doar adapter-ul LoRA (~20 MB). Ca să-l folosești cu
 `AutoModelForCausalLM` (transformers, vLLM, etc.) trebuie să-l combini
 cu modelul de bază.
 
-### Varianta recomandată — automat, din YAML
+### Varianta recomandată - automat, din YAML
 
 Surogate face merge-ul **la sfârșitul antrenamentului** dacă adaugi în
 config:
@@ -175,10 +175,10 @@ merge_adapter: true
 ```
 
 (default e `false`). Când e activ, după ultimul pas Surogate salvează în
-`output_dir` **și** adapter-ul LoRA **și** modelul combinat — deci nu mai
+`output_dir` **și** adapter-ul LoRA **și** modelul combinat - deci nu mai
 ai nevoie de script extern.
 
-### Varianta manuală — când NU ai setat `merge_adapter`
+### Varianta manuală - când NU ai setat `merge_adapter`
 
 Dacă ai antrenat fără `merge_adapter: true` (sau vrei să combini un
 checkpoint vechi cu alt model de bază), `scripts/merge_checkpoint.py`
@@ -209,7 +209,7 @@ modal volume get surogate-outputs /merged ./merged
 **Intern:** Python-ul Modal nu are acces la `surogate` (e instalat într-un
 venv separat, `/opt/surogate/.venv/`). Script-ul apelează acel Python cu
 `subprocess`, care face `from surogate.utils.adapter_merge import
-merge_adapter` și combină greutățile LoRA direct în straturile modelului.
+merge_adapter` și combină weights-urile LoRA direct în straturile modelului.
 
 ---
 
@@ -265,9 +265,9 @@ domenii specifice.
 
 ---
 
-## 9. Debugging — probleme întâlnite și soluții
+## 9. Debugging - probleme întâlnite și soluții
 
-Au apărut în timpul validării acestui ghid — dacă le vezi, iată fix-urile:
+Au apărut în timpul validării acestui ghid - dacă le vezi, iată fix-urile:
 
 | Eroare                                                      | Cauză                                              | Fix                                                                         |
 | ----------------------------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -282,17 +282,17 @@ Au apărut în timpul validării acestui ghid — dacă le vezi, iată fix-urile
 
 ## 10. Tips
 
-- **Cache-ul imaginii** — Modal rebuildește doar ce s-a schimbat. Dacă
+- **Cache-ul imaginii** - Modal rebuildește doar ce s-a schimbat. Dacă
   editezi doar YAML-urile, se recompune doar layer-ul `add_local_file`
   (secunde). Dacă schimbi `run_commands`, se face build complet (~3 min).
-- **Cache-ul dataset-ului** — tokenizarea `OpenLLM-Ro/ro_gsm8k` se salvează
+- **Cache-ul dataset-ului** - tokenizarea `OpenLLM-Ro/ro_gsm8k` se salvează
   în volum după prima rulare. Rulările ulterioare o reutilizează (log:
   _"Tokenization hash unchanged ..."_).
-- **Loss determinist** — rulările bf16 pe L4 și A100 dau EXACT același
+- **Loss determinist** - rulările bf16 pe L4 și A100 dau EXACT același
   loss per pas (seed fix, operații deterministe). Util pentru debugging.
-- **Cost real** — în acest repo toate 4 rulările împreună au costat mai
+- **Cost real** - în acest repo toate 4 rulările împreună au costat mai
   puțin de $0.30. Nu ezita să experimentezi.
-- **Observă `SOL`** — "Speed of Light" din log e procent din peak-ul
+- **Observă `SOL`** - "Speed of Light" din log e procent din peak-ul
   teoretic al GPU-ului. >20% e sănătos pentru modele mici; <5% = problemă.
 
 ---

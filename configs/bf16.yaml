@@ -1,5 +1,5 @@
 # ==========================================================================
-# Surogate SFT config — recipe BF16 (bază)
+# Surogate SFT config - recipe BF16 (bază)
 # Rulat cu:  modal run run_gpu_test.py::test_l4
 #            modal run run_gpu_test.py::test_a100
 # Merge pe ORICE GPU (T4, L4, A10, L40S, A100-*, H100, H200, RTX PRO 6000, B200).
