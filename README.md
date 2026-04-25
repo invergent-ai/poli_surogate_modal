@@ -303,12 +303,14 @@ validation_datasets:
     system_prompt: "You are a chess grandmaster. Given a position and move history, respond with the best next move in SAN notation."
 ```
 
-Rulezi cu (folosind același entry-point Modal, doar schimbi YAML-ul în
-`run_gpu_test.py` sau adaugi o funcție nouă):
+Rulezi cu entry-point-ul deja wired în `run_gpu_test.py`:
 
 ```bash
-modal run run_gpu_test.py::test_a100   # după ce point-ezi la chess_pure.yaml
+modal run run_gpu_test.py::train_chess_pure   # A100-80GB + bf16
 ```
+
+A100-80GB e ales ca "default solid" pentru bf16 - dataset-ul lichess-2200
+e mic, n-are sens un GPU mai scump.
 
 ### Caz B - dataset deja în format chat (conversation)
 
@@ -336,6 +338,16 @@ validation_datasets:
 
 System prompt-ul vine din `messages[0]` dacă există în date - nu mai
 setezi `system_prompt` separat (ar fi ignorat).
+
+Rulezi cu:
+
+```bash
+modal run run_gpu_test.py::train_chess_mix    # H100 + bf16
+```
+
+H100 (în loc de A100) pentru că dataset-ul are 200k exemple - throughput-ul
+Hopper la bf16 se amortizează rapid, costul extra ($3.95 vs $2.50/h) iese
+prin timpul redus.
 
 ### Cum aleg între cele două
 

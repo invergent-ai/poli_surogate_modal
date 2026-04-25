@@ -1,11 +1,15 @@
 """
-Surogate SFT pe Modal - 4 entry-points, una pe GPU.
+Surogate SFT pe Modal - entry-points pentru fiecare combinație GPU+config.
 
-Folosire:
+Folosire (smoke tests pe ro_gsm8k):
     modal run run_gpu_test.py::test_l4              # L4  + bf16
     modal run run_gpu_test.py::test_l40s            # L40S + fp8-hybrid
     modal run run_gpu_test.py::test_a100            # A100-80GB + bf16
     modal run run_gpu_test.py::test_rtx_pro_6000    # RTX PRO 6000 + nvfp4
+
+Folosire (dataset-uri chess - vezi README sectiunea 8.1):
+    modal run run_gpu_test.py::train_chess_pure     # A100-80GB + bf16, lichess-2200
+    modal run run_gpu_test.py::train_chess_mix      # H100 + bf16, chess-sft-mix-200k
 
 Cum adaugi un GPU nou: copiază una din funcțiile de mai jos, schimbă
 `gpu="..."` (vezi tabelul din README) și YAML-ul corespunzător.
@@ -83,3 +87,19 @@ def test_a100():
 @app.function(gpu="RTX-PRO-6000", **_fn_kwargs)
 def test_rtx_pro_6000():
     _train("/workspace/nvfp4.yaml", "RTX PRO 6000 + nvfp4")
+
+
+# --- Antrenamente chess (dataset-uri reale, vezi README 8.1) ---
+
+# A100-80GB + bf16 = "default solid" pentru lichess-2200 (instruction format).
+# Dataset-ul e mic, deci nu merită un GPU mai scump.
+@app.function(gpu="A100-80GB", **_fn_kwargs)
+def train_chess_pure():
+    _train("/workspace/chess_pure.yaml", "A100-80GB + bf16 + lichess-2200")
+
+
+# H100 + bf16 pentru chess-sft-mix-200k (conversation format).
+# Dataset cu 200k exemple - throughput-ul Hopper se amortizează rapid.
+@app.function(gpu="H100", **_fn_kwargs)
+def train_chess_mix():
+    _train("/workspace/chess_mix.yaml", "H100 + bf16 + chess-sft-mix-200k")
