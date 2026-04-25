@@ -13,6 +13,8 @@ diferite, cu dataset-ul românesc `OpenLLM-Ro/ro_gsm8k`.
 | `configs/bf16.yaml`           | Config SFT recipe **bf16** (merge pe orice GPU)      |
 | `configs/fp8.yaml`            | Config SFT recipe **fp8-hybrid** (Ada+)              |
 | `configs/nvfp4.yaml`          | Config SFT recipe **nvfp4** (doar Blackwell)         |
+| `configs/chess_pure.yaml`     | Exemplu dataset HF cu coloane `input`/`output`       |
+| `configs/chess_mix.yaml`      | Exemplu dataset HF în format chat (`messages`)       |
 | `scripts/merge_checkpoint.py` | Script Modal care combină LoRA-ul cu modelul de bază |
 | `images/`                     | Screenshot-uri din Modal de la rulările de referință |
 
@@ -245,6 +247,8 @@ domenii specifice.
   `tatsu-lab/alpaca`) sau cale `/workspace/my.jsonl`. Dacă folosești JSONL
   local, adaugă-l în imagine cu
   `image.add_local_file("data.jsonl", "/workspace/data.jsonl")`.
+  Pentru detalii pe formatele de dataset (instruction vs conversation,
+  validation split, system prompt) vezi secțiunea **8.1**.
 - **Alt model:** `model: <HF_ID>`. Pentru modele mai mari (7B+) verifică
   că GPU-ul are VRAM suficient; scade `per_device_train_batch_size` dacă e
   cazul.
@@ -259,6 +263,160 @@ domenii specifice.
       _train("/workspace/fp8.yaml", "H100 + fp8-hybrid")
   ```
   Apoi `modal run run_gpu_test.py::test_h100`.
+
+---
+
+## 8.1. Exemplu real - două dataset-uri de șah pe HF
+
+Două situații tipice cu dataset-uri de pe HuggingFace, cu config-uri gata
+făcute în `configs/chess_pure.yaml` și `configs/chess_mix.yaml`. Diferența
+între ele e **schema rândurilor**, nu conținutul.
+
+### Caz A - dataset cu coloane `input`/`output` (instruction)
+
+[`cetusian/chess-sft-lichess-2200`](https://huggingface.co/datasets/cetusian/chess-sft-lichess-2200)
+are pe fiecare rând două coloane string: `input` (poziția + istoricul
+mutărilor) și `output` (mutarea bună în SAN). Splituri: `train` +
+`validation`.
+
+Surogate nu poate folosi direct astfel de rânduri - trebuie să-i spui ce
+coloană devine user turn și ce coloană devine assistant turn. Asta face
+`type: instruction`:
+
+```yaml
+datasets:
+  - path: cetusian/chess-sft-lichess-2200   # HF repo id
+    split: train
+    type: instruction                       # input+output → chat
+    instruction_field: input                # coloana → user turn
+    output_field: output                    # coloana → assistant turn
+    system_prompt_type: fixed               # un singur system prompt fix
+    system_prompt: "You are a chess grandmaster. Given a position and move history, respond with the best next move in SAN notation."
+
+validation_datasets:
+  - path: cetusian/chess-sft-lichess-2200
+    split: validation                       # alt split, restul identic
+    type: instruction
+    instruction_field: input
+    output_field: output
+    system_prompt_type: fixed
+    system_prompt: "You are a chess grandmaster. Given a position and move history, respond with the best next move in SAN notation."
+```
+
+Rulezi cu (folosind același entry-point Modal, doar schimbi YAML-ul în
+`run_gpu_test.py` sau adaugi o funcție nouă):
+
+```bash
+modal run run_gpu_test.py::test_a100   # după ce point-ezi la chess_pure.yaml
+```
+
+### Caz B - dataset deja în format chat (conversation)
+
+[`cetusian/chess-sft-mix-200k`](https://huggingface.co/datasets/cetusian/chess-sft-mix-200k)
+are o singură coloană, `messages`, care e deja o listă de
+`{"role": ..., "content": ...}` (system + user + assistant). Tot
+`train` + `validation`.
+
+Aici Surogate nu trebuie să transforme nimic - îi spui doar că rândurile
+sunt deja conversații cu `type: conversation`:
+
+```yaml
+datasets:
+  - path: cetusian/chess-sft-mix-200k
+    split: train
+    type: conversation
+    messages_field: messages                # default e tot "messages", explicit pentru claritate
+
+validation_datasets:
+  - path: cetusian/chess-sft-mix-200k
+    split: validation
+    type: conversation
+    messages_field: messages
+```
+
+System prompt-ul vine din `messages[0]` dacă există în date - nu mai
+setezi `system_prompt` separat (ar fi ignorat).
+
+### Cum aleg între cele două
+
+| Dacă rândul tău arată ca...                                  | Folosește           |
+| ------------------------------------------------------------ | ------------------- |
+| `{"input": "...", "output": "..."}` (sau alte 2 coloane string) | `type: instruction` cu `instruction_field` + `output_field` |
+| `{"messages": [{"role": "...", "content": "..."}, ...]}`     | `type: conversation` cu `messages_field`                    |
+| Format alpaca standard (`instruction`/`input`/`output`)      | `type: alpaca` (Surogate îl recunoaște direct)              |
+| Nu ești sigur                                                | `type: auto` - lasă Surogate să detecteze                   |
+
+### Două note importante
+
+1. **`validation_datasets:` cere `eval_steps > 0`** în config. Dacă lași
+   `eval_steps: 0` (cum e în `bf16.yaml`), val loss-ul nu se calculează
+   chiar dacă declari split-ul. Ambele config-uri chess au `eval_steps: 50`.
+2. **`max_steps: 50`** din config-urile de smoke-test e prea mic pentru un
+   antrenament real pe 200k exemple. `chess_pure.yaml` și `chess_mix.yaml`
+   au `max_steps: 200` - tot doar pentru a vedea că merge end-to-end.
+   Pentru rulare reală pe tot dataset-ul, șterge linia (`= 1 epocă`) sau
+   pune o valoare mare (ex. 5000).
+
+---
+
+## 8.2. Token HF - când e nevoie și cum se setează
+
+**Pentru cele două dataset-uri din 8.1 (`cetusian/chess-sft-*`) NU îți
+trebuie token** - sunt publice (CC0), Modal le descarcă anonim. La fel
+pentru `OpenLLM-Ro/ro_gsm8k` și `Qwen/Qwen3-0.6B`.
+
+**Ai nevoie de token doar dacă** modelul sau dataset-ul tău e:
+
+- gated (ex. `meta-llama/Llama-3.1-8B`, `google/gemma-2-9b`, dataset-uri
+  cu "Agree to share contact info"),
+- privat (repo-uri din contul/organizația ta neexpuse public).
+
+### Pasul 1 - obține token-ul
+
+[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+→ **New token** → tip `Read` (suficient pentru download). Pentru modele
+gated, intră înainte pe pagina modelului și apasă "Agree and access".
+
+### Pasul 2 - creează un Modal Secret cu el
+
+```bash
+modal secret create huggingface HF_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+(Numele `huggingface` e doar o convenție - poți folosi orice. Verifici
+cu `modal secret list`.)
+
+### Pasul 3 - atașează secret-ul la funcția de antrenament
+
+În `run_gpu_test.py`, adaugă `secrets=[...]` la decorator. Cea mai
+simplă variantă - îl pui în `_fn_kwargs` ca să se aplice la toate
+funcțiile dintr-o dată:
+
+```python
+_fn_kwargs = dict(
+    image=image,
+    timeout=30 * 60,
+    volumes={"/output": vol},
+    secrets=[modal.Secret.from_name("huggingface")],   # NOU
+)
+```
+
+Modal expune `HF_TOKEN` ca variabilă de mediu în container, iar
+`huggingface_hub` (folosit intern de Surogate) o detectează automat -
+nu trebuie cod în plus.
+
+### Verificare rapidă
+
+Dacă token-ul lipsește pentru un repo gated, eroarea în log e:
+
+```
+huggingface_hub.utils._errors.GatedRepoError: 401 Client Error
+Cannot access gated repo for url ...
+```
+
+Dacă vezi asta cu un dataset/model care ar trebui să fie public, e
+probabil typo în `path:` din YAML (HF returnează tot 401 pentru
+repo-uri inexistente, nu 404).
 
 ---
 

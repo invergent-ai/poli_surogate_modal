@@ -1,0 +1,55 @@
+# ==========================================================================
+# Surogate SFT config - exemplu chess pe dataset deja în format chat
+# Dataset: cetusian/chess-sft-mix-200k
+#   - rânduri cu o singură coloană:  messages = [{role, content}, ...]
+#   - splituri:                       train  +  validation
+# Format pentru Surogate: type: conversation → folosește direct lista
+# de mesaje (system/user/assistant). System prompt-ul vine din messages[0].
+# Merge pe orice GPU (recipe bf16).
+# ==========================================================================
+
+model: Qwen/Qwen3-0.6B
+output_dir: /output
+
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 4
+
+sample_packing: true
+sequence_len: 2048
+
+max_steps: 200
+eval_steps: 50
+
+learning_rate: 2e-4
+warmup_ratio: 0.1
+
+recipe: bf16
+
+lora: true
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+dataloader_num_workers: 4
+
+# --- Train split ---
+datasets:
+  - path: cetusian/chess-sft-mix-200k
+    split: train
+    type: conversation                # rândurile sunt deja în format chat
+    messages_field: messages          # coloana care ține lista de mesaje (default: "messages")
+
+# --- Validation split ---
+validation_datasets:
+  - path: cetusian/chess-sft-mix-200k
+    split: validation
+    type: conversation
+    messages_field: messages

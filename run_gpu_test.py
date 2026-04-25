@@ -37,6 +37,8 @@ image = (
     .add_local_file("configs/bf16.yaml", "/workspace/bf16.yaml")
     .add_local_file("configs/fp8.yaml", "/workspace/fp8.yaml")
     .add_local_file("configs/nvfp4.yaml", "/workspace/nvfp4.yaml")
+    .add_local_file("configs/chess_pure.yaml", "/workspace/chess_pure.yaml")
+    .add_local_file("configs/chess_mix.yaml", "/workspace/chess_mix.yaml")
 )
 
 # Volum persistent - aici rămân LoRA adapter, log-urile și dataset-ul tokenizat.

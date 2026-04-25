@@ -1,0 +1,61 @@
+# ==========================================================================
+# Surogate SFT config - exemplu chess pe dataset cu coloane input/output
+# Dataset: cetusian/chess-sft-lichess-2200
+#   - rânduri cu coloane:  input  (poziție + istoric mutări) + output (mutarea SAN)
+#   - splituri:            train  +  validation
+# Format pentru Surogate: type: instruction → input devine user turn,
+# output devine assistant turn, system_prompt e prefixat o singură dată.
+# Merge pe orice GPU (recipe bf16). Pentru fp8 schimbă recipe-ul.
+# ==========================================================================
+
+model: Qwen/Qwen3-0.6B
+output_dir: /output
+
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 4
+
+sample_packing: true
+sequence_len: 2048
+
+max_steps: 200                         # 200 pași = ~smoke test pe dataset real
+eval_steps: 50                         # eval la fiecare 50 pași (val loss vizibil în log)
+
+learning_rate: 2e-4
+warmup_ratio: 0.1
+
+recipe: bf16
+
+lora: true
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0
+lora_target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - o_proj
+  - gate_proj
+  - up_proj
+  - down_proj
+
+dataloader_num_workers: 4
+
+# --- Train split ---
+datasets:
+  - path: cetusian/chess-sft-lichess-2200   # HF repo id
+    split: train
+    type: instruction                       # mapează input+output → chat [user, assistant]
+    instruction_field: input                # coloana cu prompt-ul (poziția + istoric)
+    output_field: output                    # coloana cu răspunsul (mutarea SAN)
+    system_prompt_type: fixed               # un singur system prompt fix pe tot dataset-ul
+    system_prompt: "You are a chess grandmaster. Given a position and move history, respond with the best next move in SAN notation."
+
+# --- Validation split (același dataset, alt split) ---
+validation_datasets:
+  - path: cetusian/chess-sft-lichess-2200
+    split: validation
+    type: instruction
+    instruction_field: input
+    output_field: output
+    system_prompt_type: fixed
+    system_prompt: "You are a chess grandmaster. Given a position and move history, respond with the best next move in SAN notation."
