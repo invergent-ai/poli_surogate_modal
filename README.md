@@ -34,6 +34,9 @@ uv pip install modal                 # instalează Modal CLI + SDK
 
 > Dacă n-ai `uv`, îl instalezi cu `curl -LsSf https://astral.sh/uv/install.sh | sh`.
 > Alternativ, poți folosi `python3.12 -m venv .venv && pip install modal`.
+>
+> **Pe Linux**, după instalare adaugă `uv` în PATH cu `source $HOME/.local/bin/env`
+> (sau deschide un terminal nou). Pentru permanent: `echo 'source $HOME/.local/bin/env' >> ~/.bashrc`.
 
 **Pasul 2 - autentificare.** Încearcă:
 
