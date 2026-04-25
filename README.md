@@ -241,6 +241,56 @@ domenii specifice.
 
 ---
 
+## 7.1. Modele suportate de Surogate
+
+Surogate are un registry intern de arhitecturi - nu poate antrena orice
+model HF. Dacă pui în `model:` un repo a cărui arhitectură nu e
+înregistrată, primești la runtime:
+
+```
+RuntimeError: DSL compilation failed for <Architecture>:
+  - undefined identifier '<Architecture>'
+```
+
+Verifică pe pagina HF a modelului câmpul `architectures` din `config.json`
+înainte de a-l folosi.
+
+### Familii suportate (din `examples/sft/` în repo-ul Surogate)
+
+| Familie         | Arhitectură (`config.json` → `architectures`) | Exemplu `model:` din YAML                          | Acces |
+| --------------- | --------------------------------------------- | -------------------------------------------------- | ----- |
+| **Qwen3**       | `Qwen3ForCausalLM`                            | `Qwen/Qwen3-0.6B`, `-1.7B`, `-4B`, `-8B`, `-14B`, `-32B` | public |
+| **Qwen3-VL**    | `Qwen3VLForConditionalGeneration`             | `Qwen/Qwen3-VL-2B-Instruct`                        | public |
+| **Qwen3-MoE**   | `Qwen3MoeForCausalLM`                         | `nvidia/Qwen3-30B-A3B-NVFP4`                       | public |
+| **Qwen3.5**     | `Qwen3_5ForCausalLM` / `…ForConditionalGeneration` | `Qwen/Qwen3.5-0.8B` (text + VL)                | public |
+| **Qwen3.5-MoE** | `Qwen3_5MoeForCausalLM`                       | `Qwen/Qwen3.5-35B-A3B-FP8`                         | public |
+| **Qwen3.6-MoE** | `Qwen3_6MoeForCausalLM`                       | `Qwen/Qwen3.6-35B-A3B-FP8`                         | public |
+| **Llama 3.x**   | `LlamaForCausalLM`                            | `meta-llama/Llama-3.2-1B`, `-3B`, `Llama-3.1-8B`, `-70B` | gated (HF token) |
+| **Gemma 4**     | `Gemma4ForCausalLM`                           | `google/gemma-4-E2B-it`                            | gated (HF token) |
+| **GPT-OSS**     | `GptOssForCausalLM`                           | `openai/gpt-oss-20b`                               | public |
+| **Nemotron 3**  | `NemotronHForCausalLM`                        | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-NVFP4`, `nvidia/Nemotron-Cascade-2-30B-A3B` | public |
+
+Pentru gated (Llama, Gemma) ai nevoie de HF token - vezi sect. **8.2**.
+
+### NU sunt suportate (cazuri întâlnite)
+
+| Model                                | Arhitectură            | De ce nu                                     |
+| ------------------------------------ | ---------------------- | -------------------------------------------- |
+| Qwen2 / **Qwen2.5** / Qwen2-VL       | `Qwen2ForCausalLM`     | Generație anterioară, nu e în registry       |
+| Mistral 7B / Mixtral 8x7B            | `MistralForCausalLM`   | Nu e în registry                             |
+| Phi-2 / Phi-3                        | `Phi*ForCausalLM`      | Nu e în registry                             |
+| Gemma 1 / 2 / 3                      | `Gemma*ForCausalLM`    | Doar Gemma 4 e suportat                      |
+| Llama 1 / 2                          | `LlamaForCausalLM`     | Tehnic merge (același nume), dar netestate; folosește 3.x |
+
+**Regula scurtă:** dacă ai vrut Qwen2.5-7B, folosește `Qwen/Qwen3-8B`
+(drop-in, public). Dacă ai vrut Llama-3.1-8B, ai nevoie de HF token + acord
+pe pagina modelului.
+
+Lista oficială cu YAML-uri exemplu (sursa pentru tabel):
+[`invergent-ai/surogate/examples/sft`](https://github.com/invergent-ai/surogate/tree/main/examples/sft).
+
+---
+
 ## 8. Modificări tipice
 
 - **Alt dataset:** în YAML, `datasets[0].path` → HF id (ex.
